@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from etl.models import PriceRecord, Product
+from api.models import ProductORM
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +91,7 @@ class ETLRepository:
             Exception: If database query fails
         """
         try:
-            from api.models import ProductORM
-
+            
             stmt = select(ProductORM).where(ProductORM.is_active == True)
             result = await self.session.execute(stmt)
             products = result.scalars().all()

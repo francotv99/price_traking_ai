@@ -7,6 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from etl.models import ETLResult
 from api.dependencies import get_session, get_settings
 
+from etl.fetcher import CoinGeckoFetcher
+from etl.parser import ETLParser
+from etl.repository import ETLRepository
+
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/etl", tags=["etl"])
@@ -27,10 +32,7 @@ async def run_etl(
     Raises:
         HTTPException: If ETL execution fails
     """
-    from etl.fetcher import CoinGeckoFetcher
-    from etl.parser import ETLParser
-    from etl.repository import ETLRepository
-
+    
     result = ETLResult(status="ok")
     repository = ETLRepository(session)
 
