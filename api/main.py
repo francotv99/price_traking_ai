@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.dependencies import init_db, close_db, get_settings
 from etl.router import router as etl_router
 from ml.router import router as ml_router
+from rag.router import router as rag_router
 
 # Configure logging
 logging.basicConfig(
@@ -85,6 +86,7 @@ async def status_check():
 # Register routers
 app.include_router(etl_router)
 app.include_router(ml_router)
+app.include_router(rag_router)
 
 
 @app.exception_handler(Exception)
