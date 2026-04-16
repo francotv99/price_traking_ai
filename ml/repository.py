@@ -19,9 +19,18 @@ class MLRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_price_history(self, product_id: str, lookback_days: int) -> list[PricePoint]:
+    async def get_price_history(
+        self,
+        product_id: str,
+        lookback_days: int = 90,
+        lookback_minutes: int | None = None,
+    ) -> list[PricePoint]:
         """Fetch historical price series for a product."""
-        since = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        now = datetime.now(timezone.utc)
+        if lookback_minutes is not None:
+            since = now - timedelta(minutes=lookback_minutes)
+        else:
+            since = now - timedelta(days=lookback_days)
 
         stmt = (
             select(PriceRecordORM)

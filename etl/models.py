@@ -35,6 +35,7 @@ class ETLResult(BaseModel):
     
     status: str = Field(..., description="'ok' or 'error'")
     products_processed: int = Field(default=0, description="Products attempted")
+    product_ids: list[str] = Field(default_factory=list, description="Product IDs processed")
     records_inserted: int = Field(default=0, description="New records inserted")
     records_skipped: int = Field(default=0, description="Duplicate records")
     errors: list[str] = Field(default_factory=list, description="Error messages")

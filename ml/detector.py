@@ -31,7 +31,11 @@ class AnomalyDetector:
     def detect(self, product_id: str, series: list[PricePoint]) -> AnomalyResult:
         """Detect whether the latest point in a series is anomalous."""
         if len(series) < 10:
-            return AnomalyResult(anomaly=False, product_id=product_id)
+            return AnomalyResult(
+                anomaly=False,
+                product_id=product_id,
+                explanation="Not enough historical points (minimum 10) to evaluate anomalies.",
+            )
 
         prices = np.array([float(point.price_usd) for point in series], dtype=float)
         times = np.array([point.recorded_at.timestamp() for point in series], dtype=float)
@@ -58,13 +62,26 @@ class AnomalyDetector:
             delta_pct = ((float(latest_price) - expected) / expected) * 100.0
 
         if not is_anomaly:
-            return AnomalyResult(anomaly=False, product_id=product_id)
+            return AnomalyResult(
+                anomaly=False,
+                product_id=product_id,
+                explanation="Latest point is within normal range according to Isolation Forest.",
+            )
 
         category = self._classify_category(series, delta_pct)
+        forced_by_soft_guard = False
 
         # Soft guard aligned with config threshold for opportunity relevance.
         if abs(delta_pct) < self.opportunity_delta_threshold * 100 and category == AnomalyCategory.OPPORTUNITY:
             category = AnomalyCategory.DATA_ERROR
+            forced_by_soft_guard = True
+
+        explanation = self._build_explanation(
+            series=series,
+            delta_pct=delta_pct,
+            category=category,
+            forced_by_soft_guard=forced_by_soft_guard,
+        )
 
         return AnomalyResult(
             anomaly=True,
@@ -74,6 +91,7 @@ class AnomalyDetector:
             price_actual=latest_price,
             price_expected=expected_price,
             delta_pct=round(delta_pct, 4),
+            explanation=explanation,
         )
 
     def _classify_category(self, series: list[PricePoint], delta_pct: float) -> AnomalyCategory:
@@ -92,3 +110,44 @@ class AnomalyDetector:
             return AnomalyCategory.OPPORTUNITY
 
         return AnomalyCategory.OPPORTUNITY
+
+    def _build_explanation(
+        self,
+        series: list[PricePoint],
+        delta_pct: float,
+        category: AnomalyCategory,
+        forced_by_soft_guard: bool,
+    ) -> str:
+        """Provide a readable explanation for classification outcomes."""
+        if len(series) < 2:
+            return "Anomaly classified as DATA_ERROR due to insufficient temporal context."
+
+        last_time = series[-1].recorded_at
+        prev_time = series[-2].recorded_at
+        elapsed_hours = max((last_time - prev_time).total_seconds() / 3600.0, 0.0)
+        abs_delta_pct = abs(delta_pct)
+        opportunity_threshold_pct = self.opportunity_delta_threshold * 100
+
+        if forced_by_soft_guard:
+            return (
+                "Outlier detected, but delta_pct "
+                f"({abs_delta_pct:.4f}%) is below opportunity threshold "
+                f"({opportunity_threshold_pct:.2f}%), so it was classified as DATA_ERROR."
+            )
+
+        if abs_delta_pct > 40.0 and elapsed_hours <= float(self.anomaly_window_hours):
+            return (
+                "Large jump detected "
+                f"({abs_delta_pct:.4f}% in {elapsed_hours:.2f}h), treated as potential data error."
+            )
+
+        if abs_delta_pct > 40.0 and elapsed_hours >= 6.0:
+            return (
+                "Large sustained move detected "
+                f"({abs_delta_pct:.4f}% over {elapsed_hours:.2f}h), classified as OPPORTUNITY."
+            )
+
+        return (
+            "Outlier detected with delta_pct "
+            f"{abs_delta_pct:.4f}% and category {category.value}."
+        )

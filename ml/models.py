@@ -19,6 +19,12 @@ class DetectAnomalyRequest(BaseModel):
 
     product_id: str = Field(..., description="Product ID (e.g. bitcoin)")
     lookback_days: int = Field(default=90, ge=1, le=3650)
+    lookback_minutes: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10080,
+        description="Optional lookback window in minutes (overrides lookback_days)",
+    )
 
 
 class PricePoint(BaseModel):
@@ -39,6 +45,7 @@ class AnomalyResult(BaseModel):
     price_actual: Optional[Decimal] = None
     price_expected: Optional[Decimal] = None
     delta_pct: Optional[float] = None
+    explanation: Optional[str] = None
 
 
 class AnomalyEventCreate(BaseModel):

@@ -29,6 +29,7 @@ async def detect_anomaly(
         history = await repository.get_price_history(
             product_id=payload.product_id,
             lookback_days=payload.lookback_days,
+            lookback_minutes=payload.lookback_minutes,
         )
 
         detector = AnomalyDetector(
@@ -49,6 +50,7 @@ async def detect_anomaly(
                     price_actual=result.price_actual,
                     price_expected=result.price_expected,
                     delta_pct=result.delta_pct,
+                    explanation=result.explanation,
                 )
             )
             logger.info(

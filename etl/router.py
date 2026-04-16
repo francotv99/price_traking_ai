@@ -1,4 +1,5 @@
 """FastAPI router for ETL endpoints."""
+import asyncio
 import logging
 from typing import Optional
 
@@ -40,9 +41,9 @@ async def run_etl(
         # Get active products
         products = await repository.get_active_products()
         result.products_processed = len(products)
+        result.product_ids = [p.external_id for p in products]
 
         logger.info(f"Starting ETL for {len(products)} products")
-
         # Fetch and process each product
         async with CoinGeckoFetcher(
             base_url=settings.coingecko_base_url,
@@ -81,11 +82,13 @@ async def run_etl(
                     logger.error(error_msg)
                     result.errors.append(error_msg)
 
+                # CoinGecko free tier is strict; pace requests to reduce 429s.
+                await asyncio.sleep(1.2)
+
         logger.info(
             f"ETL completed: {result.records_inserted} inserted, "
             f"{result.records_skipped} skipped, {len(result.errors)} errors"
         )
-
         return result
 
     except Exception as e:
