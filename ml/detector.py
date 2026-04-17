@@ -40,7 +40,6 @@ class AnomalyDetector:
         prices = np.array([float(point.price_usd) for point in series], dtype=float)
         times = np.array([point.recorded_at.timestamp() for point in series], dtype=float)
 
-        # Features: price level and first difference magnitude.
         diffs = np.diff(prices, prepend=prices[0])
         x = np.column_stack([prices, np.abs(diffs), times - times.min()])
 
@@ -51,7 +50,6 @@ class AnomalyDetector:
         is_anomaly = predictions[-1] == -1
         latest_price = Decimal(str(prices[-1]))
 
-        # Expected price from recent baseline window.
         baseline_window = prices[:-1][-24:] if len(prices) > 1 else prices
         expected = float(np.median(baseline_window)) if len(baseline_window) else float(prices[-1])
         expected_price = Decimal(str(round(expected, 8)))
@@ -71,7 +69,6 @@ class AnomalyDetector:
         category = self._classify_category(series, delta_pct)
         forced_by_soft_guard = False
 
-        # Soft guard aligned with config threshold for opportunity relevance.
         if abs(delta_pct) < self.opportunity_delta_threshold * 100 and category == AnomalyCategory.OPPORTUNITY:
             category = AnomalyCategory.DATA_ERROR
             forced_by_soft_guard = True

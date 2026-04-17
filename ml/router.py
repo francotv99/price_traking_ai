@@ -41,6 +41,11 @@ async def detect_anomaly(
         result = detector.detect(product_id=payload.product_id, series=history)
 
         if result.anomaly:
+            assert result.category is not None
+            assert result.score is not None
+            assert result.price_actual is not None
+            assert result.price_expected is not None
+            assert result.delta_pct is not None
             await repository.create_anomaly_event(
                 AnomalyEventCreate(
                     product_id=result.product_id,
@@ -62,7 +67,7 @@ async def detect_anomaly(
 
         return result
 
-    except Exception as exc:
+    except (ValueError, RuntimeError) as exc:
         logger.exception("ML detection failed for %s", payload.product_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

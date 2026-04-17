@@ -18,6 +18,9 @@ venv/
 # Egg info
 *.egg-info/
 
+# Type checking cache
+.mypy_cache/
+
 # IDE
 .vscode/
 .idea/

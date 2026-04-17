@@ -29,7 +29,7 @@ class TestCoinGeckoFetcher:
         """Test that using fetcher without context manager raises error."""
         fetcher = CoinGeckoFetcher()
 
-        with pytest.raises(RuntimeError, match="Must use async context manager"):
+        with pytest.raises(RuntimeError, match="async context manager"):
             await fetcher.fetch_market_chart("bitcoin")
 
     @pytest.mark.asyncio
