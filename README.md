@@ -43,6 +43,8 @@ Workflow 3 — Reindexación RAG
 
 Ver diagramas detallados en [docs/diagrams/](docs/diagrams/).
 
+Las decisiones de diseño y trade-offs están documentadas en [docs/decisions.md](docs/decisions.md).
+
 ---
 
 ## Stack tecnológico
@@ -195,12 +197,22 @@ ruff check --fix . && black . && isort .
 mypy api/ etl/ ml/ rag/
 ```
 
+### Evaluación del modelo ML
+
+El notebook `ml/evaluation.ipynb` evalúa el detector con datos sintéticos y genera métricas de clasificación (precision, recall, F1, ROC AUC), análisis de sensibilidad al parámetro `contamination` y tablas de supuestos y modos de fallo.
+
 ### Pre-commit (ejecuta todo lo anterior en cada commit)
 
 ```bash
 pre-commit install
 pre-commit run --all-files
 ```
+
+---
+
+## API interactiva
+
+Swagger UI disponible en `http://localhost:8000/docs` una vez levantada la API. Permite explorar y probar todos los endpoints sin necesidad de curl.
 
 ---
 
@@ -316,20 +328,6 @@ Ver diagrama ERD completo en [docs/diagrams/erd.png](docs/diagrams/erd.png).
 | Corpus sin reseñas de usuarios | El corpus RAG se construye desde la API de CoinGecko (descripción, market data, community). No incluye reseñas externas. |
 | n8n como punto único de orquestación | Si n8n no está disponible, el pipeline se detiene aunque el backend esté operativo. Mitigado con healthchecks en docker-compose. |
 | Sin autenticación en la API | Los endpoints no requieren autenticación. En producción se requiere API key o JWT. |
-
----
-
-## Hoja de ruta
-
-| Prioridad | Mejora |
-|-----------|--------|
-| Alta | Autenticación en la API (JWT o API key) |
-| Alta | Reentrenamiento incremental del modelo ML con persistencia |
-| Media | Incorporar reseñas de usuarios al corpus RAG (Reddit, CoinMarketCap) |
-| Media | Soporte para más activos (acciones, ETFs, commodities) |
-| Media | Dashboard web para visualizar histórico de anomalías |
-| Baja | Migrar a TimescaleDB para queries de series de tiempo más eficientes |
-| Baja | Implementar A/B testing de modelos ML en paralelo |
 
 ---
 
