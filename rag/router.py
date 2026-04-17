@@ -32,13 +32,20 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
     products_reindexed = []
     errors: list[str] = []
 
+    qdrant_url = f"http://{settings.qdrant_host}:{settings.qdrant_port}"
+
     try:
         async with CoinGeckoFetcher(
             base_url=settings.coingecko_base_url,
             api_key=settings.coingecko_api_key,
-        ) as fetcher:
+        ) as fetcher, httpx.AsyncClient(timeout=15) as qdrant_client:
             for product_id in products:
                 try:
+                    # Delete stale chunks for this product before reindexing.
+                    await qdrant_client.post(
+                        f"{qdrant_url}/collections/{settings.qdrant_collection}/points/delete",
+                        json={"filter": {"must": [{"key": "product_id", "match": {"value": product_id}}]}},
+                    )
                     result = await builder.build_for_product(product_id=product_id, fetcher=fetcher)
                     products_results.append(result)
                     products_reindexed.append(product_id)

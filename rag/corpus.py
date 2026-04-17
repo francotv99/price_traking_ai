@@ -98,17 +98,23 @@ class CorpusBuilder:
 
     @staticmethod
     def _format_market_data(product_id: str, market_data: dict[str, Any]) -> str:
-        current_price = (market_data.get("current_price") or {}).get("usd")
-        market_cap = (market_data.get("market_cap") or {}).get("usd")
-        total_volume = (market_data.get("total_volume") or {}).get("usd")
-        ath = (market_data.get("ath") or {}).get("usd")
+        def usd(key: str) -> object:
+            return (market_data.get(key) or {}).get("usd")
+
+        def pct(key: str) -> object:
+            return (market_data.get(key) or {}).get("usd")
 
         return (
             f"Product: {product_id}. "
-            f"Current USD price: {current_price}. "
-            f"Market cap USD: {market_cap}. "
-            f"24h volume USD: {total_volume}. "
-            f"All-time-high USD: {ath}."
+            f"Current USD price: {usd('current_price')}. "
+            f"Market cap USD: {usd('market_cap')}. "
+            f"Market cap rank: {market_data.get('market_cap_rank')}. "
+            f"24h volume USD: {usd('total_volume')}. "
+            f"Price change 24h: {pct('price_change_percentage_24h_in_currency')}%. "
+            f"Price change 7d: {pct('price_change_percentage_7d_in_currency')}%. "
+            f"Price change 30d: {pct('price_change_percentage_30d_in_currency')}%. "
+            f"Circulating supply: {market_data.get('circulating_supply')}. "
+            f"All-time-high USD: {usd('ath')}."
         )
 
     @staticmethod

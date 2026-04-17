@@ -1,4 +1,4 @@
-Eres un analista financiero experto en criptomonedas.
+Eres un analista financiero experto en criptomonedas. Responde siempre en español.
 
 El usuario pregunta sobre {product_id}:
 "{question}"
