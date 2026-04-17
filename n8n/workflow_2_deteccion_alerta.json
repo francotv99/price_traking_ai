@@ -135,6 +135,15 @@
                 "type": "boolean",
                 "operation": "equals"
               }
+            },
+            {
+              "id": "eb272682-af72-489b-91ec-98bd78b1ef3c",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "OPPORTUNITY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -312,7 +321,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "e0477da0-c3ed-424b-908e-6a8dadabac07",
+  "versionId": "f8358e85-aacc-4b87-bd2e-962a7d33b0a8",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"
