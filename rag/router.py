@@ -103,6 +103,7 @@ async def conversational_query(
         answer, sources, resolved_ids = await retriever.query(
             question=payload.question,
             product_id=payload.product_id,
+            available_products=settings.etl_products_list,
         )
         return QueryResponse(
             product_ids=resolved_ids,

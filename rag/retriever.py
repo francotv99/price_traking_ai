@@ -30,7 +30,12 @@ class RAGRetriever:
         self.openai_llm_key = openai_api_key_for_llm or openai_api_key
         self.top_k = top_k
 
-    async def query(self, question: str, product_id: str | None = None) -> tuple[str, list[str], list[str]]:
+    async def query(
+        self,
+        question: str,
+        product_id: str | None = None,
+        available_products: list[str] | None = None,
+    ) -> tuple[str, list[str], list[str]]:
         """Answer a free-form question, inferring one or more products from the question if not provided."""
         async with httpx.AsyncClient(timeout=60) as client:
             if product_id:
@@ -39,6 +44,15 @@ class RAGRetriever:
                 resolved_ids = await self._extract_product_ids(client, question)
 
             if resolved_ids == ["unknown"]:
+                catalog = available_products or []
+                if catalog:
+                    listed = ", ".join(catalog)
+                    return (
+                        f"Tengo información disponible sobre: {listed}. "
+                        "¿Sobre cuál quieres saber?",
+                        [],
+                        ["unknown"],
+                    )
                 return (
                     "No identifiqué ninguna criptomoneda en tu pregunta. "
                     "Prueba mencionando bitcoin, ethereum, solana o cardano.",
