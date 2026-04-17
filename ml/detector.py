@@ -67,17 +67,11 @@ class AnomalyDetector:
             )
 
         category = self._classify_category(series, delta_pct)
-        forced_by_soft_guard = False
-
-        if abs(delta_pct) < self.opportunity_delta_threshold * 100 and category == AnomalyCategory.OPPORTUNITY:
-            category = AnomalyCategory.DATA_ERROR
-            forced_by_soft_guard = True
 
         explanation = self._build_explanation(
             series=series,
             delta_pct=delta_pct,
             category=category,
-            forced_by_soft_guard=forced_by_soft_guard,
         )
 
         return AnomalyResult(
@@ -92,30 +86,36 @@ class AnomalyDetector:
         )
 
     def _classify_category(self, series: list[PricePoint], delta_pct: float) -> AnomalyCategory:
-        """Classify anomaly between opportunity and likely data error."""
+        """Classify anomaly as OPPORTUNITY or DATA_ERROR.
+
+        OPPORTUNITY: sustained move above the configured threshold.
+        DATA_ERROR: fast spike (likely bad tick) or move too small to be relevant.
+        """
         if len(series) < 2:
             return AnomalyCategory.DATA_ERROR
 
         last_time = series[-1].recorded_at
         prev_time = series[-2].recorded_at
         elapsed_hours = max((last_time - prev_time).total_seconds() / 3600.0, 0.0)
+        abs_delta = abs(delta_pct)
+        threshold_pct = self.opportunity_delta_threshold * 100
 
-        if abs(delta_pct) > 40.0 and elapsed_hours <= float(self.anomaly_window_hours):
+        # Fast spike in a short window is likely a bad data point.
+        if abs_delta > 40.0 and elapsed_hours <= float(self.anomaly_window_hours):
             return AnomalyCategory.DATA_ERROR
 
-        if abs(delta_pct) > 40.0 and elapsed_hours >= 6.0:
+        # Sustained, significant move qualifies as a real market opportunity.
+        if abs_delta >= threshold_pct and elapsed_hours >= 6.0:
             return AnomalyCategory.OPPORTUNITY
 
-        return AnomalyCategory.OPPORTUNITY
+        return AnomalyCategory.DATA_ERROR
 
     def _build_explanation(
         self,
         series: list[PricePoint],
         delta_pct: float,
         category: AnomalyCategory,
-        forced_by_soft_guard: bool,
     ) -> str:
-        """Provide a readable explanation for classification outcomes."""
         if len(series) < 2:
             return "Anomaly classified as DATA_ERROR due to insufficient temporal context."
 
@@ -123,28 +123,21 @@ class AnomalyDetector:
         prev_time = series[-2].recorded_at
         elapsed_hours = max((last_time - prev_time).total_seconds() / 3600.0, 0.0)
         abs_delta_pct = abs(delta_pct)
-        opportunity_threshold_pct = self.opportunity_delta_threshold * 100
-
-        if forced_by_soft_guard:
-            return (
-                "Outlier detected, but delta_pct "
-                f"({abs_delta_pct:.4f}%) is below opportunity threshold "
-                f"({opportunity_threshold_pct:.2f}%), so it was classified as DATA_ERROR."
-            )
+        threshold_pct = self.opportunity_delta_threshold * 100
 
         if abs_delta_pct > 40.0 and elapsed_hours <= float(self.anomaly_window_hours):
             return (
-                "Large jump detected "
-                f"({abs_delta_pct:.4f}% in {elapsed_hours:.2f}h), treated as potential data error."
+                f"Large jump ({abs_delta_pct:.2f}% in {elapsed_hours:.2f}h) "
+                "in a short window — likely a bad data point."
             )
 
-        if abs_delta_pct > 40.0 and elapsed_hours >= 6.0:
+        if category == AnomalyCategory.OPPORTUNITY:
             return (
-                "Large sustained move detected "
-                f"({abs_delta_pct:.4f}% over {elapsed_hours:.2f}h), classified as OPPORTUNITY."
+                f"Sustained move of {abs_delta_pct:.2f}% over {elapsed_hours:.2f}h "
+                f"exceeds the {threshold_pct:.1f}% opportunity threshold."
             )
 
         return (
-            "Outlier detected with delta_pct "
-            f"{abs_delta_pct:.4f}% and category {category.value}."
+            f"Outlier detected ({abs_delta_pct:.2f}% over {elapsed_hours:.2f}h) "
+            f"but below the {threshold_pct:.1f}% opportunity threshold — classified as DATA_ERROR."
         )
