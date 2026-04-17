@@ -42,3 +42,20 @@ class ReindexResponse(BaseModel):
     errors: list[str]
     products: list[ProductReindexResult]
     generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class QueryRequest(BaseModel):
+    """Request payload for the conversational RAG endpoint."""
+
+    product_id: str = Field(..., description="Product to query (e.g. bitcoin)")
+    question: str = Field(..., min_length=3, description="Free-form question about the product")
+
+
+class QueryResponse(BaseModel):
+    """Response from the conversational RAG endpoint."""
+
+    product_id: str
+    question: str
+    answer: str
+    sources: list[str] = Field(description="Corpus sections used to build the answer")
+    answered_at: datetime = Field(default_factory=datetime.utcnow)

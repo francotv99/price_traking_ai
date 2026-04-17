@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from api.dependencies import get_settings
 from etl.fetcher import CoinGeckoFetcher
 from rag.corpus import CorpusBuilder
-from rag.models import ReindexRequest, ReindexResponse
+from rag.models import QueryRequest, QueryResponse, ReindexRequest, ReindexResponse
+from rag.retriever import RAGRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -60,4 +61,51 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"RAG reindex failed: {exc}",
+        ) from exc
+
+
+@router.post("/query", response_model=QueryResponse)
+async def conversational_query(
+    payload: QueryRequest,
+    settings=Depends(get_settings),
+) -> QueryResponse:
+    """Answer a free-form question about a registered product using RAG.
+
+    Generates an embedding for the question, retrieves semantically similar
+    chunks from Qdrant filtered by product, and calls the LLM with the
+    versioned prompt from prompts/conversational_query.txt.
+
+    If no chunks are indexed for the product, returns an actionable message
+    instead of hallucinating an answer.
+    """
+    if not settings.openai_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OPENAI_API_KEY is not configured.",
+        )
+
+    retriever = RAGRetriever(
+        qdrant_host=settings.qdrant_host,
+        qdrant_port=settings.qdrant_port,
+        qdrant_collection=settings.qdrant_collection,
+        openai_api_key=settings.openai_api_key,
+    )
+
+    try:
+        answer, sources = await retriever.query(
+            product_id=payload.product_id,
+            question=payload.question,
+        )
+        return QueryResponse(
+            product_id=payload.product_id,
+            question=payload.question,
+            answer=answer,
+            sources=sources,
+        )
+
+    except Exception as exc:
+        logger.exception("RAG query failed for product=%s", payload.product_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"RAG query failed: {exc}",
         ) from exc
