@@ -51,12 +51,12 @@ async def test_query_returns_answer_and_sources(retriever: RAGRetriever) -> None
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        answer, sources, resolved_id = await retriever.query("What is Bitcoin's market cap?", product_id="bitcoin")
+        answer, sources, resolved_ids = await retriever.query("What is Bitcoin's market cap?", product_id="bitcoin")
 
     assert "Bitcoin" in answer
     assert "market_data" in sources
     assert "description" in sources
-    assert resolved_id == "bitcoin"
+    assert resolved_ids == ["bitcoin"]
 
 
 @pytest.mark.asyncio
@@ -74,10 +74,31 @@ async def test_query_infers_product_from_question(retriever: RAGRetriever) -> No
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        answer, sources, resolved_id = await retriever.query("cómo está el btc hoy?")
+        answer, sources, resolved_ids = await retriever.query("cómo está el btc hoy?")
 
-    assert resolved_id == "bitcoin"
+    assert resolved_ids == ["bitcoin"]
     assert answer == "Bitcoin is at 50k."
+
+
+@pytest.mark.asyncio
+async def test_query_handles_multiple_products(retriever: RAGRetriever) -> None:
+    extract_resp = _mock_response({"choices": [{"message": {"content": "bitcoin,ethereum"}}]})
+    embed_resp = _mock_response({"data": [{"embedding": [0.1] * 1536}]})
+    search_btc = _mock_response({"result": [{"payload": {"source": "market_data", "text": "BTC at 50k"}}]})
+    search_eth = _mock_response({"result": [{"payload": {"source": "market_data", "text": "ETH at 3k"}}]})
+    generate_resp = _mock_response({"choices": [{"message": {"content": "BTC y ETH muestran tendencia alcista."}}]})
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[extract_resp, embed_resp, search_btc, search_eth, generate_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        answer, sources, resolved_ids = await retriever.query("tendencia del ETH y BTC?")
+
+    assert "bitcoin" in resolved_ids
+    assert "ethereum" in resolved_ids
+    assert "alcista" in answer
 
 
 @pytest.mark.asyncio
@@ -90,9 +111,9 @@ async def test_query_returns_unknown_message_when_no_crypto(retriever: RAGRetrie
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        answer, sources, resolved_id = await retriever.query("qué tiempo hace hoy?")
+        answer, sources, resolved_ids = await retriever.query("qué tiempo hace hoy?")
 
-    assert resolved_id == "unknown"
+    assert resolved_ids == ["unknown"]
     assert sources == []
     assert "criptomoneda" in answer.lower()
 

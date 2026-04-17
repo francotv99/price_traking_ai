@@ -100,12 +100,12 @@ async def conversational_query(
     )
 
     try:
-        answer, sources, resolved_id = await retriever.query(
+        answer, sources, resolved_ids = await retriever.query(
             question=payload.question,
             product_id=payload.product_id,
         )
         return QueryResponse(
-            product_id=resolved_id,
+            product_ids=resolved_ids,
             question=payload.question,
             answer=answer,
             sources=sources,

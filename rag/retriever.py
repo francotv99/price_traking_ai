@@ -30,37 +30,53 @@ class RAGRetriever:
         self.openai_llm_key = openai_api_key_for_llm or openai_api_key
         self.top_k = top_k
 
-    async def query(self, question: str, product_id: str | None = None) -> tuple[str, list[str], str]:
-        """Answer a free-form question, inferring the product from the question if not provided."""
+    async def query(self, question: str, product_id: str | None = None) -> tuple[str, list[str], list[str]]:
+        """Answer a free-form question, inferring one or more products from the question if not provided."""
         async with httpx.AsyncClient(timeout=60) as client:
-            resolved_id = product_id or await self._extract_product_id(client, question)
+            if product_id:
+                resolved_ids = [product_id]
+            else:
+                resolved_ids = await self._extract_product_ids(client, question)
 
-            if resolved_id == "unknown":
+            if resolved_ids == ["unknown"]:
                 return (
                     "No identifiqué ninguna criptomoneda en tu pregunta. "
                     "Prueba mencionando bitcoin, ethereum, solana o cardano.",
                     [],
-                    "unknown",
+                    ["unknown"],
                 )
 
             query_vector = await self._embed(client, question)
-            chunks = await self._search(client, product_id=resolved_id, vector=query_vector)
 
-            if not chunks:
+            all_chunks: list[dict] = []
+            missing: list[str] = []
+            for pid in resolved_ids:
+                chunks = await self._search(client, product_id=pid, vector=query_vector)
+                if chunks:
+                    all_chunks.extend(chunks)
+                else:
+                    missing.append(pid)
+
+            if not all_chunks:
                 return (
-                    f"No hay información indexada para '{resolved_id}' en el corpus. "
-                    "Ejecuta primero POST /rag/reindex para indexar el corpus del producto.",
+                    f"No hay información indexada para {resolved_ids} en el corpus. "
+                    "Ejecuta primero POST /rag/reindex para indexar el corpus.",
                     [],
-                    resolved_id,
+                    resolved_ids,
                 )
 
-            sources = [c["payload"].get("source", "unknown") for c in chunks]
-            context = self._build_context(chunks)
-            answer = await self._generate(client, product_id=resolved_id, question=question, context=context)
-            return answer, list(dict.fromkeys(sources)), resolved_id
+            sources = list(dict.fromkeys(c["payload"].get("source", "unknown") for c in all_chunks))
+            context = self._build_context(all_chunks)
+            products_label = " y ".join(resolved_ids)
+            answer = await self._generate(client, product_id=products_label, question=question, context=context)
 
-    async def _extract_product_id(self, client: httpx.AsyncClient, question: str) -> str:
-        """Infer CoinGecko product ID from a free-form question."""
+            if missing:
+                answer += f"\n\n⚠️ Sin datos indexados para: {', '.join(missing)}."
+
+            return answer, sources, resolved_ids
+
+    async def _extract_product_ids(self, client: httpx.AsyncClient, question: str) -> list[str]:
+        """Infer one or more CoinGecko product IDs from a free-form question."""
         response = await client.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {self.openai_api_key}"},
@@ -70,22 +86,24 @@ class RAGRetriever:
                     {
                         "role": "system",
                         "content": (
-                            "Extrae el ID de CoinGecko de la criptomoneda mencionada en el mensaje. "
-                            "Responde SOLO con el ID en minúsculas. "
-                            "Ejemplos de alias válidos: btc/BTC/Bitcoin → bitcoin, "
+                            "Extrae los IDs de CoinGecko de todas las criptomonedas mencionadas. "
+                            "Responde SOLO con los IDs en minúsculas separados por coma, sin espacios. "
+                            "Alias válidos: btc/BTC/Bitcoin → bitcoin, "
                             "eth/ETH/Ethereum/ether → ethereum, sol/SOL/Solana → solana, "
                             "ada/ADA/Cardano → cardano. "
-                            "Si no se menciona ninguna criptomoneda, responde exactamente: unknown"
+                            "Ejemplo de múltiples: bitcoin,ethereum "
+                            "Si no hay ninguna criptomoneda, responde exactamente: unknown"
                         ),
                     },
                     {"role": "user", "content": question},
                 ],
                 "temperature": 0,
-                "max_tokens": 20,
+                "max_tokens": 40,
             },
         )
         response.raise_for_status()
-        return str(response.json()["choices"][0]["message"]["content"]).strip().lower()
+        raw = str(response.json()["choices"][0]["message"]["content"]).strip().lower()
+        return [p.strip() for p in raw.split(",") if p.strip()]
 
     async def _embed(self, client: httpx.AsyncClient, text: str) -> list[float]:
         response = await client.post(

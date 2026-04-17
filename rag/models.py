@@ -42,7 +42,7 @@ class QueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    product_id: str
+    product_ids: list[str]
     question: str
     answer: str
     sources: list[str] = Field(description="Corpus sections used to build the answer")
