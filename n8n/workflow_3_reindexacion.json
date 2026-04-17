@@ -56,12 +56,6 @@
               "name": "debug",
               "value": "http://host.docker.internal:8000",
               "type": "string"
-            },
-            {
-              "id": "a5be0560-8b0a-41df-bf83-12e27d166f8c",
-              "name": "open_ai_toke",
-              "value": "Bearer {{ $env.OPENAI_API_KEY }}",
-              "type": "string"
             }
           ]
         },
@@ -824,7 +818,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "19872807-376e-4ce0-a3ff-a097aa5f98bf",
+  "versionId": "03e2d878-36c5-4416-b27e-1b24f131d737",
   "meta": {
     "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"
   },
