@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencies import get_settings
@@ -41,7 +42,7 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
                     result = await builder.build_for_product(product_id=product_id, fetcher=fetcher)
                     products_results.append(result)
                     products_reindexed.append(product_id)
-                except Exception as exc:
+                except (httpx.HTTPError, OSError, RuntimeError) as exc:
                     msg = f"Failed to reindex {product_id}: {exc}"
                     logger.exception(msg)
                     errors.append(msg)

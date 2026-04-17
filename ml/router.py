@@ -62,7 +62,7 @@ async def detect_anomaly(
 
         return result
 
-    except Exception as exc:
+    except (ValueError, RuntimeError) as exc:
         logger.exception("ML detection failed for %s", payload.product_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
