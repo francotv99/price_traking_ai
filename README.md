@@ -2,6 +2,10 @@
 
 Sistema de monitoreo de precios de criptomonedas con detección de anomalías mediante Machine Learning y alertas enriquecidas con RAG (Retrieval-Augmented Generation).
 
+## Demo
+
+[Ver demostración en video (Loom)](https://www.loom.com/share/519dc7c628ab4882b93fc4b550dd384b)
+
 ---
 
 ## Descripción del problema
