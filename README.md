@@ -43,6 +43,8 @@ Workflow 3 — Reindexación RAG
 
 Ver diagramas detallados en [docs/diagrams/](docs/diagrams/).
 
+Las decisiones de diseño y trade-offs están documentadas en [docs/decisions.md](docs/decisions.md).
+
 ---
 
 ## Stack tecnológico
@@ -195,12 +197,22 @@ ruff check --fix . && black . && isort .
 mypy api/ etl/ ml/ rag/
 ```
 
+### Evaluación del modelo ML
+
+El notebook `ml/evaluation.ipynb` evalúa el detector con datos sintéticos y genera métricas de clasificación (precision, recall, F1, ROC AUC), análisis de sensibilidad al parámetro `contamination` y tablas de supuestos y modos de fallo.
+
 ### Pre-commit (ejecuta todo lo anterior en cada commit)
 
 ```bash
 pre-commit install
 pre-commit run --all-files
 ```
+
+---
+
+## API interactiva
+
+Swagger UI disponible en `http://localhost:8000/docs` una vez levantada la API. Permite explorar y probar todos los endpoints sin necesidad de curl.
 
 ---
 
