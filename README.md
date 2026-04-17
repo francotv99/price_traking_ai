@@ -2,6 +2,10 @@
 
 Sistema de monitoreo de precios de criptomonedas con detección de anomalías mediante Machine Learning y alertas enriquecidas con RAG (Retrieval-Augmented Generation).
 
+## Demo
+
+[Ver demostración en video (Loom)](https://www.loom.com/share/519dc7c628ab4882b93fc4b550dd384b)
+
 ---
 
 ## Descripción del problema
@@ -130,7 +134,7 @@ curl http://localhost:8000/health
 | `DATABASE_URL` | Cadena de conexión PostgreSQL | `postgresql://finup:finup@localhost:5433/finup_db` |
 | `QDRANT_HOST` | Host de Qdrant | `localhost` |
 | `QDRANT_PORT` | Puerto de Qdrant | `6333` |
-| `QDRANT_COLLECTION` | Nombre de la colección vectorial | `product_corpus` |
+| `QDRANT_COLLECTION` | Nombre de la colección vectorial | `crypto_chunks` |
 | `ANTHROPIC_API_KEY` | API key de Anthropic (Claude) | `sk-ant-...` |
 | `OPENAI_API_KEY` | API key de OpenAI (embeddings + GPT) | `sk-proj-...` |
 | `COINGECKO_BASE_URL` | URL base de CoinGecko | `https://api.coingecko.com/api/v3` |
@@ -228,6 +232,37 @@ Verificar que los datos llegaron a PostgreSQL:
 docker exec -it finup_postgres psql -U finup -d finup_db \
   -c "SELECT product_id, COUNT(*), MIN(recorded_at), MAX(recorded_at) FROM price_records GROUP BY product_id;"
 ```
+
+---
+
+## Endpoint conversacional
+
+Consultas libres sobre cualquier producto registrado. No requiere que n8n esté corriendo.
+
+```bash
+curl -X POST http://localhost:8000/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_id": "bitcoin",
+    "question": "¿Cuál es el market cap actual de bitcoin?"
+  }'
+```
+
+Respuesta esperada:
+
+```json
+{
+  "product_id": "bitcoin",
+  "question": "¿Cuál es el market cap actual de bitcoin?",
+  "answer": "Según los datos indexados, el market cap de Bitcoin es...",
+  "sources": ["market_data", "description"],
+  "answered_at": "2026-04-16T..."
+}
+```
+
+> Requiere que el corpus esté indexado en Qdrant. Ejecutar `POST /rag/reindex` primero si es la primera vez.
+
+También disponible en el Swagger: `http://localhost:8000/docs`
 
 ---
 

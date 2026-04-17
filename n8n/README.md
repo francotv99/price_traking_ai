@@ -11,11 +11,10 @@ Exported n8n workflow definitions in JSON format.
 
 2. **workflow_2_deteccion_alerta.json**
    - Trigger: Webhook from workflow_1
-   - Action: POST /ml/detect
+   - Action: POST /ml/detect (per product)
    - If anomaly:
-     - Search Qdrant
-     - Call LLM for explanation
-     - Send email/Slack
+     - Search Qdrant (semantic retrieval)
+     - Send Telegram notification
      - Trigger workflow_3_reindexacion
 
 3. **workflow_3_reindexacion.json**
@@ -34,6 +33,6 @@ Exported n8n workflow definitions in JSON format.
 
 ## Implementation Status
 
-- [ ] workflow_1_ingesta.json
-- [ ] workflow_2_deteccion_alerta.json
-- [ ] workflow_3_reindexacion.json
+- [x] workflow_1_ingesta.json
+- [x] workflow_2_deteccion_alerta.json
+- [x] workflow_3_reindexacion.json
