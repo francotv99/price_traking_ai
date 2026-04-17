@@ -67,7 +67,7 @@ class ETLRepository:
 
             # PostgreSQL ON CONFLICT DO NOTHING doesn't return row count directly
             # so we estimate: total - duplicates (by checking if all inserted)
-            inserted = min(result.rowcount or 0, len(records))
+            inserted = min(getattr(result, "rowcount", None) or 0, len(records))
             skipped = len(records) - inserted
 
             logger.info(
@@ -101,10 +101,10 @@ class ETLRepository:
             return [
                 Product(
                     id=str(p.id),
-                    external_id=p.external_id,
-                    name=p.name,
-                    source=p.source,
-                    is_active=p.is_active,
+                    external_id=p.external_id,  # type: ignore[arg-type]
+                    name=p.name,  # type: ignore[arg-type]
+                    source=p.source,  # type: ignore[arg-type]
+                    is_active=p.is_active,  # type: ignore[arg-type]
                     created_at=p.created_at,
                 )
                 for p in products
@@ -143,10 +143,10 @@ class ETLRepository:
                 return None
 
             return PriceRecord(
-                product_id=price_row.product_id,
-                price_usd=price_row.price_usd,
-                recorded_at=price_row.recorded_at,
-                source=price_row.source,
+                product_id=price_row.product_id,  # type: ignore[arg-type]
+                price_usd=price_row.price_usd,  # type: ignore[arg-type]
+                recorded_at=price_row.recorded_at,  # type: ignore[arg-type]
+                source=price_row.source,  # type: ignore[arg-type]
             )
 
         except Exception as e:

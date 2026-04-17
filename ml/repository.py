@@ -44,9 +44,9 @@ class MLRepository:
 
         return [
             PricePoint(
-                product_id=row.product_id,
-                price_usd=row.price_usd,
-                recorded_at=row.recorded_at,
+                product_id=row.product_id,  # type: ignore[arg-type]
+                price_usd=row.price_usd,  # type: ignore[arg-type]
+                recorded_at=row.recorded_at,  # type: ignore[arg-type]
             )
             for row in rows
         ]
@@ -57,10 +57,10 @@ class MLRepository:
             product_id=payload.product_id,
             detected_at=payload.detected_at,
             category=payload.category.value,
-            score=payload.score,
-            price_actual=payload.price_actual,
-            price_expected=payload.price_expected,
-            delta_pct=payload.delta_pct,
+            score=payload.score,  # type: ignore[arg-type]
+            price_actual=payload.price_actual,  # type: ignore[arg-type]
+            price_expected=payload.price_expected,  # type: ignore[arg-type]
+            delta_pct=payload.delta_pct,  # type: ignore[arg-type]
             explanation=payload.explanation,
         )
 

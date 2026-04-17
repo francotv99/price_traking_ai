@@ -55,7 +55,7 @@ class RAGRetriever:
             json={"input": text, "model": "text-embedding-ada-002"},
         )
         response.raise_for_status()
-        return response.json()["data"][0]["embedding"]
+        return list(response.json()["data"][0]["embedding"])
 
     async def _search(self, client: httpx.AsyncClient, product_id: str, vector: list[float]) -> list[dict]:
         response = await client.post(
@@ -70,7 +70,7 @@ class RAGRetriever:
             },
         )
         response.raise_for_status()
-        return response.json().get("result", [])
+        return list(response.json().get("result", []))
 
     async def _generate(self, client: httpx.AsyncClient, product_id: str, question: str, context: str) -> str:
         prompt = _PROMPT_TEMPLATE.format(
@@ -89,7 +89,7 @@ class RAGRetriever:
             },
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+        return str(response.json()["choices"][0]["message"]["content"]).strip()
 
     @staticmethod
     def _build_context(chunks: list[dict]) -> str:

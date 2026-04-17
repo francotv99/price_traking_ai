@@ -86,7 +86,7 @@ class CoinGeckoFetcher:
 
         logger.info("Fetching coin info for %s", product_id)
         response = await self._get_with_retry(url=url, params=params)
-        return response.json()
+        return dict(response.json())
 
     async def _get_with_retry(self, url: str, params: dict) -> httpx.Response:
         """GET with exponential backoff for 429 and 5xx responses."""
