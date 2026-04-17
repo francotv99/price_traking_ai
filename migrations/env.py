@@ -8,6 +8,10 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+from dotenv import load_dotenv
+
+# Load environment variables from .env for local development runs.
+load_dotenv()
 
 # This is the Alembic Config object, which provides the values of the
 # alembic.ini file, plus some functions to
@@ -67,7 +71,7 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = os.environ.get(
         "DATABASE_URL",
-        "postgresql://finup:finup@localhost:5432/finup_db"
+        "postgresql://finup:finup@localhost:5433/finup_db"
     )
     
     connectable = engine_from_config(

@@ -1,0 +1,322 @@
+{
+  "name": "ml_procesing_price",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0c6441b-6e1c-4b77-bb6f-41e0efec1b74",
+              "name": "crypto_currency",
+              "value": "={{ $json.body }}",
+              "type": "array"
+            },
+            {
+              "id": "52d9397e-6cb7-4183-a306-cf9450395952",
+              "name": "prod",
+              "value": "http://localhost:8000",
+              "type": "string"
+            },
+            {
+              "id": "cd270e51-6cc3-430e-9374-dde3fe8a9620",
+              "name": "debug",
+              "value": "http://host.docker.internal:8000",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -160,
+        -16
+      ],
+      "id": "e1e6596a-3cad-411e-842c-eddf83c417af",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Edit Fields').item.json.debug }}/ml/detect",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "product_id",
+              "value": "={{ $json.crypto_currency }}"
+            },
+            {
+              "name": "lookback_minutes",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        -16
+      ],
+      "id": "71cf0821-1025-4502-a378-17b030a73d9c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "79687973-d4bc-4473-8148-978bedaf078f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -400,
+        -16
+      ],
+      "id": "c9cc78fc-27d1-4991-a3ca-731d5d649692",
+      "name": "Webhook",
+      "webhookId": "79687973-d4bc-4473-8148-978bedaf078f"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "crypto_currency",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -16
+      ],
+      "id": "1459e8ca-510d-43ed-8a90-af1e96ab0adc",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "chatId": "5529415400",
+        "text": "=Alerta ML - Anomalia detectada\n\nCrypto: {{ $('HTTP Request').item.json.product_id }}\nCategoria: {{ $('HTTP Request').item.json.category }}\n\nPrecio actual: {{ $('HTTP Request').item.json.price_actual }}USD\nPrecio esperado: {{ $('HTTP Request').item.json.price_expected }}USD\nDelta:{{ $('HTTP Request').item.json.delta_pct }}%\n\nDetalle:\n{{ $('HTTP Request').item.json.explanation }}\n\nDetectado en: {{ $now }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        -112
+      ],
+      "id": "6157470d-e34c-4be9-9391-e96bb56032c2",
+      "name": "Send a text message",
+      "webhookId": "b6508e7d-0190-45a3-8d0e-b00a602dabf8",
+      "credentials": {
+        "telegramApi": {
+          "id": "7QVVv7cC54f7U7vl",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "828579ae-340c-40dd-8508-d6c90fd8832f",
+              "leftValue": "={{ $json.anomaly }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        -16
+      ],
+      "id": "623948f2-d491-4750-ad40-17d3f44f4646",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        736,
+        80
+      ],
+      "id": "8f95ed8c-6a79-48c6-b2ea-b7141044282d",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/dff6ad3b-34b3-4ea0-a849-5ee3cb8d2b56",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "product_id",
+              "value": "={{ $('HTTP Request').item.json.product_id }}"
+            },
+            {
+              "name": "category",
+              "value": "={{ $('HTTP Request').item.json.category }}"
+            },
+            {
+              "name": "delta_pct",
+              "value": "={{ $('HTTP Request').item.json.delta_pct }}"
+            },
+            {
+              "name": "explanation",
+              "value": "={{ $('HTTP Request').item.json.explanation }}"
+            },
+            {
+              "name": "detected_at",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        944,
+        -112
+      ],
+      "id": "603440c0-c1a8-40c1-b895-8ed197a68dac",
+      "name": "HTTP Request1"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "accept": "application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7",
+            "content-type": "application/json",
+            "user-agent": "axios/1.15.0",
+            "content-length": "41",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "host": "localhost:5678",
+            "connection": "close"
+          },
+          "params": {},
+          "query": {},
+          "body": [
+            "bitcoin",
+            "ethereum",
+            "solana",
+            "cardano"
+          ],
+          "webhookUrl": "http://localhost:5678/webhook/79687973-d4bc-4473-8148-978bedaf078f",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e0477da0-c3ed-424b-908e-6a8dadabac07",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"
+  },
+  "id": "TTNi6ERWRHJYDf9B",
+  "tags": []
+}

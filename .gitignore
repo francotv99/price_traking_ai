@@ -6,3 +6,21 @@ env/
 dist/
 build/
 venv/
+
+# Credenciales — nunca versionar
+.env
+*.env
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Egg info
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
