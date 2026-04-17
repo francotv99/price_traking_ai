@@ -1,7 +1,120 @@
-"""Tests for RAG corpus chunking utilities."""
+"""Tests for RAG corpus chunking utilities and retriever."""
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from rag.corpus import CorpusBuilder
+from rag.retriever import RAGRetriever
 
+
+# ---------------------------------------------------------------------------
+# RAGRetriever
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def retriever() -> RAGRetriever:
+    return RAGRetriever(
+        qdrant_host="localhost",
+        qdrant_port=6333,
+        qdrant_collection="crypto_chunks",
+        openai_api_key="test-key",
+        top_k=3,
+    )
+
+
+def _mock_response(json_data: dict, status_code: int = 200) -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.json.return_value = json_data
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_query_returns_answer_and_sources(retriever: RAGRetriever) -> None:
+    embed_resp = _mock_response({"data": [{"embedding": [0.1] * 1536}]})
+    search_resp = _mock_response({
+        "result": [
+            {"payload": {"source": "market_data", "text": "Bitcoin price is 50k"}},
+            {"payload": {"source": "description", "text": "Bitcoin is a decentralized currency"}},
+        ]
+    })
+    generate_resp = _mock_response({
+        "choices": [{"message": {"content": "Bitcoin market cap is large."}}]
+    })
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[embed_resp, search_resp, generate_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        answer, sources = await retriever.query("bitcoin", "What is Bitcoin's market cap?")
+
+    assert "Bitcoin" in answer
+    assert "market_data" in sources
+    assert "description" in sources
+
+
+@pytest.mark.asyncio
+async def test_query_returns_reindex_message_when_no_chunks(retriever: RAGRetriever) -> None:
+    embed_resp = _mock_response({"data": [{"embedding": [0.0] * 1536}]})
+    search_resp = _mock_response({"result": []})
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[embed_resp, search_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        answer, sources = await retriever.query("unknown-coin", "What is this?")
+
+    assert "reindex" in answer.lower() or "POST /rag/reindex" in answer
+    assert sources == []
+
+
+@pytest.mark.asyncio
+async def test_query_deduplicates_sources(retriever: RAGRetriever) -> None:
+    embed_resp = _mock_response({"data": [{"embedding": [0.1] * 1536}]})
+    search_resp = _mock_response({
+        "result": [
+            {"payload": {"source": "market_data", "text": "chunk 1"}},
+            {"payload": {"source": "market_data", "text": "chunk 2"}},
+            {"payload": {"source": "description", "text": "chunk 3"}},
+        ]
+    })
+    generate_resp = _mock_response({
+        "choices": [{"message": {"content": "Answer."}}]
+    })
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[embed_resp, search_resp, generate_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        _, sources = await retriever.query("bitcoin", "Price?")
+
+    assert sources.count("market_data") == 1
+
+
+def test_build_context_formats_chunks() -> None:
+    chunks = [
+        {"payload": {"source": "description", "text": "Bitcoin is decentralized."}},
+        {"payload": {"source": "market_data", "text": "Price: 50000 USD"}},
+    ]
+    context = RAGRetriever._build_context(chunks)
+
+    assert "[1] Fuente: description" in context
+    assert "[2] Fuente: market_data" in context
+    assert "Bitcoin is decentralized." in context
+
+
+# ---------------------------------------------------------------------------
+# CorpusBuilder
+# ---------------------------------------------------------------------------
 
 def test_chunk_text_splits_long_input() -> None:
     builder = CorpusBuilder(chunk_size=50, overlap=10)

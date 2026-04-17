@@ -1,9 +1,11 @@
 """CoinGecko API client for price fetching."""
+from __future__ import annotations
+
 import asyncio
-import httpx
 import logging
 from datetime import datetime
-from typing import Optional
+
+import httpx
 
 from etl.models import CoinGeckoPrice
 
@@ -11,34 +13,24 @@ logger = logging.getLogger(__name__)
 
 
 class CoinGeckoFetcher:
-    """Fetches price data from CoinGecko API."""
+    """Async HTTP client for CoinGecko API with retry and rate-limit handling."""
 
     def __init__(
         self,
         base_url: str = "https://api.coingecko.com/api/v3",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = 30,
         max_retries: int = 4,
         retry_base_delay: float = 1.5,
-    ):
-        """Initialize CoinGecko fetcher.
-        
-        Args:
-            base_url: CoinGecko API base URL
-            api_key: Optional API key (free tier doesn't require it)
-            timeout: Request timeout in seconds
-            max_retries: Maximum retries for 429/5xx errors
-            retry_base_delay: Base delay in seconds for exponential backoff
-        """
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self):
-        """Async context manager entry."""
+    async def __aenter__(self) -> CoinGeckoFetcher:
         self._client = httpx.AsyncClient(
             timeout=self.timeout,
             headers={
@@ -48,8 +40,7 @@ class CoinGeckoFetcher:
         )
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
+    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         if self._client:
             await self._client.aclose()
 
@@ -59,94 +50,48 @@ class CoinGeckoFetcher:
         days: int = 90,
         vs_currency: str = "usd",
     ) -> list[CoinGeckoPrice]:
-        """Fetch historical price data for a product.
-        
-        Args:
-            product_id: CoinGecko product ID (e.g., 'bitcoin')
-            days: Number of days of historical data
-            vs_currency: Target currency (default: 'usd')
-            
-        Returns:
-            List of price data points sorted by timestamp
-            
-        Raises:
-            httpx.HTTPError: On API errors
-        """
+        """Fetch historical price data for a product from CoinGecko."""
         if not self._client:
-            raise RuntimeError("Must use async context manager or call __aenter__")
+            raise RuntimeError("CoinGeckoFetcher must be used as an async context manager.")
 
         url = f"{self.base_url}/coins/{product_id}/market_chart"
-        params = {
+        params: dict[str, object] = {
             "vs_currency": vs_currency,
             "days": days,
             "interval": "daily",
         }
-
         if self.api_key:
             params["x_cg_pro_api_key"] = self.api_key
 
-        try:
-            logger.info(
-                f"Fetching {days} days of {product_id} price data from CoinGecko"
-            )
-            response = await self._get_with_retry(url=url, params=params)
-
-            data = response.json()
-            prices = data.get("prices", [])
-
-            # Convert to CoinGeckoPrice objects
-            result = [
-                CoinGeckoPrice(timestamp=ts, price=float(price))
-                for ts, price in prices
-            ]
-
-            logger.info(f"Successfully fetched {len(result)} price points for {product_id}")
-            return result
-
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to fetch {product_id}: {str(e)}")
-            raise
+        logger.info("Fetching %d days of %s prices from CoinGecko", days, product_id)
+        response = await self._get_with_retry(url=url, params=params)
+        prices = response.json().get("prices", [])
+        result = [CoinGeckoPrice(timestamp=ts, price=float(price)) for ts, price in prices]
+        logger.info("Fetched %d price points for %s", len(result), product_id)
+        return result
 
     async def fetch_coin_info(self, product_id: str) -> dict:
-        """Fetch general coin information.
-        
-        Used for RAG corpus building.
-        
-        Args:
-            product_id: CoinGecko product ID
-            
-        Returns:
-            Coin information dictionary
-            
-        Raises:
-            httpx.HTTPError: On API errors
-        """
+        """Fetch coin metadata for RAG corpus building."""
         if not self._client:
-            raise RuntimeError("Must use async context manager or call __aenter__")
+            raise RuntimeError("CoinGeckoFetcher must be used as an async context manager.")
 
         url = f"{self.base_url}/coins/{product_id}"
-        params = {
+        params: dict[str, object] = {
             "localization": False,
             "community_data": True,
             "market_data": True,
         }
-
         if self.api_key:
             params["x_cg_pro_api_key"] = self.api_key
 
-        try:
-            logger.info(f"Fetching coin info for {product_id}")
-            response = await self._get_with_retry(url=url, params=params)
-            return response.json()
-
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to fetch coin info for {product_id}: {str(e)}")
-            raise
+        logger.info("Fetching coin info for %s", product_id)
+        response = await self._get_with_retry(url=url, params=params)
+        return response.json()
 
     async def _get_with_retry(self, url: str, params: dict) -> httpx.Response:
-        """GET with retries for transient errors and CoinGecko rate limits."""
+        """GET with exponential backoff for 429 and 5xx responses."""
         if not self._client:
-            raise RuntimeError("Must use async context manager or call __aenter__")
+            raise RuntimeError("CoinGeckoFetcher must be used as an async context manager.")
 
         for attempt in range(1, self.max_retries + 1):
             response = await self._client.get(url, params=params)
@@ -159,13 +104,13 @@ class CoinGeckoFetcher:
                 response.raise_for_status()
 
             retry_after = response.headers.get("Retry-After")
-            if retry_after is not None and retry_after.isdigit():
-                delay = float(retry_after)
-            else:
-                delay = self.retry_base_delay * (2 ** (attempt - 1))
-
+            delay = (
+                float(retry_after)
+                if retry_after is not None and retry_after.isdigit()
+                else self.retry_base_delay * (2 ** (attempt - 1))
+            )
             logger.warning(
-                "CoinGecko transient error %s. Retrying in %.1fs (%s/%s)",
+                "CoinGecko %s — retrying in %.1fs (%d/%d)",
                 response.status_code,
                 delay,
                 attempt,
@@ -173,16 +118,9 @@ class CoinGeckoFetcher:
             )
             await asyncio.sleep(delay)
 
-        raise RuntimeError("Unexpected retry flow in _get_with_retry")
+        raise RuntimeError("Unexpected exit from retry loop.")
 
     @staticmethod
     def convert_timestamp(ts_ms: int) -> datetime:
-        """Convert CoinGecko timestamp (milliseconds) to datetime.
-        
-        Args:
-            ts_ms: Timestamp in milliseconds
-            
-        Returns:
-            Datetime object in UTC
-        """
+        """Convert CoinGecko millisecond timestamp to UTC datetime."""
         return datetime.utcfromtimestamp(ts_ms / 1000)
