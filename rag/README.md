@@ -92,11 +92,9 @@ Chunking parameters: **800 chars per chunk, 80 char overlap**.
 
 ## Prompts
 
-- `prompts/alert_explanation.txt` — used by n8n LLM node for anomaly alerts
 - `prompts/conversational_query.txt` — used by `/rag/query` for free-form questions
 
-Both prompts include an explicit anti-hallucination guard: if the retrieved
-context is insufficient, the LLM is instructed to declare it explicitly.
+The prompt includes an explicit anti-hallucination guard: if the retrieved context is insufficient, the LLM is instructed to declare it explicitly.
 
 ## Module Structure
 

@@ -289,7 +289,7 @@ curl -X POST http://localhost:8000/ml/detect \
 
 Si el modelo detecta una anomalía, n8n recibirá la respuesta y ejecutará automáticamente:
 1. Búsqueda semántica en Qdrant sobre el corpus de bitcoin
-2. Generación de explicación con el LLM usando el prompt versionado en `prompts/alert_explanation.txt`
+2. Generación de explicación con el LLM
 3. Envío de notificación por Telegram
 
 Para verificar que el corpus de Qdrant está indexado antes de la prueba:
