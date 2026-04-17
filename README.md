@@ -319,20 +319,6 @@ Ver diagrama ERD completo en [docs/diagrams/erd.png](docs/diagrams/erd.png).
 
 ---
 
-## Hoja de ruta
-
-| Prioridad | Mejora |
-|-----------|--------|
-| Alta | Autenticación en la API (JWT o API key) |
-| Alta | Reentrenamiento incremental del modelo ML con persistencia |
-| Media | Incorporar reseñas de usuarios al corpus RAG (Reddit, CoinMarketCap) |
-| Media | Soporte para más activos (acciones, ETFs, commodities) |
-| Media | Dashboard web para visualizar histórico de anomalías |
-| Baja | Migrar a TimescaleDB para queries de series de tiempo más eficientes |
-| Baja | Implementar A/B testing de modelos ML en paralelo |
-
----
-
 ## Estructura del proyecto
 
 ```
