@@ -52,7 +52,7 @@ class RAGRetriever:
         response = await client.post(
             "https://api.openai.com/v1/embeddings",
             headers={"Authorization": f"Bearer {self.openai_api_key}"},
-            json={"input": text, "model": "text-embedding-ada-002"},
+            json={"input": text, "model": "text-embedding-3-small"},
         )
         response.raise_for_status()
         return list(response.json()["data"][0]["embedding"])
