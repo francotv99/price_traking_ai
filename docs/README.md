@@ -35,8 +35,8 @@ Technical decisions and trade-offs:
 
 ## Implementation Status
 
-- [ ] architecture.png (with source)
-- [ ] alert_sequence.png (with source)
-- [ ] rag_pipeline.png (with source)
-- [ ] erd.png (with source)
-- [ ] decisions.md
+- [x] architecture.png
+- [x] alert_sequence.png
+- [x] rag_pipeline.png
+- [x] erd.png
+- [x] decisions.md
