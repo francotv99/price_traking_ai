@@ -51,11 +51,50 @@ async def test_query_returns_answer_and_sources(retriever: RAGRetriever) -> None
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        answer, sources = await retriever.query("bitcoin", "What is Bitcoin's market cap?")
+        answer, sources, resolved_id = await retriever.query("What is Bitcoin's market cap?", product_id="bitcoin")
 
     assert "Bitcoin" in answer
     assert "market_data" in sources
     assert "description" in sources
+    assert resolved_id == "bitcoin"
+
+
+@pytest.mark.asyncio
+async def test_query_infers_product_from_question(retriever: RAGRetriever) -> None:
+    extract_resp = _mock_response({"choices": [{"message": {"content": "bitcoin"}}]})
+    embed_resp = _mock_response({"data": [{"embedding": [0.1] * 1536}]})
+    search_resp = _mock_response({
+        "result": [{"payload": {"source": "market_data", "text": "Bitcoin price is 50k"}}]
+    })
+    generate_resp = _mock_response({"choices": [{"message": {"content": "Bitcoin is at 50k."}}]})
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[extract_resp, embed_resp, search_resp, generate_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        answer, sources, resolved_id = await retriever.query("cómo está el btc hoy?")
+
+    assert resolved_id == "bitcoin"
+    assert answer == "Bitcoin is at 50k."
+
+
+@pytest.mark.asyncio
+async def test_query_returns_unknown_message_when_no_crypto(retriever: RAGRetriever) -> None:
+    extract_resp = _mock_response({"choices": [{"message": {"content": "unknown"}}]})
+
+    async_client = AsyncMock()
+    async_client.post = AsyncMock(side_effect=[extract_resp])
+    async_client.__aenter__ = AsyncMock(return_value=async_client)
+    async_client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
+        answer, sources, resolved_id = await retriever.query("qué tiempo hace hoy?")
+
+    assert resolved_id == "unknown"
+    assert sources == []
+    assert "criptomoneda" in answer.lower()
 
 
 @pytest.mark.asyncio
@@ -69,7 +108,7 @@ async def test_query_returns_reindex_message_when_no_chunks(retriever: RAGRetrie
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        answer, sources = await retriever.query("unknown-coin", "What is this?")
+        answer, sources, _ = await retriever.query("What is this?", product_id="unknown-coin")
 
     assert "reindex" in answer.lower() or "POST /rag/reindex" in answer
     assert sources == []
@@ -95,7 +134,7 @@ async def test_query_deduplicates_sources(retriever: RAGRetriever) -> None:
     async_client.__aexit__ = AsyncMock(return_value=False)
 
     with patch("rag.retriever.httpx.AsyncClient", return_value=async_client):
-        _, sources = await retriever.query("bitcoin", "Price?")
+        _, sources, _ = await retriever.query("Price?", product_id="bitcoin")
 
     assert sources.count("market_data") == 1
 

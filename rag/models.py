@@ -37,7 +37,7 @@ class ReindexResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    product_id: str = Field(..., description="Product to query (e.g. bitcoin)")
+    product_id: str | None = Field(default=None, description="CoinGecko ID (optional — inferred from question if omitted)")
     question: str = Field(..., min_length=3, description="Free-form question about the product")
 
 
