@@ -240,13 +240,11 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ $('Edit Fields').item.json.open_ai_toke }}"
-            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -272,6 +270,12 @@
       ],
       "id": "21b77c78-8225-4ea3-93ce-560ec7f1f08e",
       "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E4h5OhC2QiAraRGH",
+          "name": "headerOpenAI"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -820,7 +824,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "5f94e868-e07d-4352-aad5-503ace50488c",
+  "versionId": "19872807-376e-4ce0-a3ff-a097aa5f98bf",
   "meta": {
     "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"
   },
