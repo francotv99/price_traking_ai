@@ -16,7 +16,7 @@
 
 **Por qué no LSTM:** Requiere datos etiquetados o ventanas de entrenamiento largas. Excesivo para el volumen de datos actual y agrega complejidad de infraestructura (GPU, TensorFlow/PyTorch).
 
-**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con umbrales explícitos en la clasificación post-modelo: solo se emite `OPPORTUNITY` si el delta supera el threshold configurado **y** el movimiento lleva al menos 6 horas, filtrando spikes cortos que casi siempre son errores de datos.
+**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con umbrales explícitos en la clasificación post-modelo: solo se emite `OPPORTUNITY` si el delta supera el threshold configurado (2% por defecto) **y** el movimiento lleva al menos 6 horas, filtrando spikes cortos que casi siempre son errores de datos.
 
 ---
 
