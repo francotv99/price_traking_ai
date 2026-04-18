@@ -136,6 +136,27 @@ def test_ml_detect_returns_no_anomaly_for_short_series(client) -> None:
     assert "Not enough" in data["explanation"]
 
 
+def test_ml_simulate_returns_opportunity(client) -> None:
+    response = client.post("/ml/detect/simulate", json={
+        "product_id": "bitcoin",
+        "base_price": 76000.0,
+        "spike_pct": 0.20,
+        "history_days": 89,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["anomaly"] is True
+    assert data["category"] == "OPPORTUNITY"
+    assert data["delta_pct"] is not None
+    assert data["price_actual"] is not None
+
+
+def test_ml_simulate_uses_default_product(client) -> None:
+    response = client.post("/ml/detect/simulate", json={})
+    assert response.status_code == 200
+    assert response.json()["product_id"] == "bitcoin"
+
+
 def test_ml_detect_rejects_missing_product_id(client) -> None:
     response = client.post("/ml/detect", json={"lookback_days": 90})
     assert response.status_code == 422
