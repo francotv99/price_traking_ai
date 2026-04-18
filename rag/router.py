@@ -39,10 +39,16 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
             base_url=settings.coingecko_base_url,
             api_key=settings.coingecko_api_key,
         ) as fetcher, httpx.AsyncClient(timeout=15) as qdrant_client:
+            check = await qdrant_client.get(f"{qdrant_url}/collections/{settings.qdrant_collection}")
+            if check.status_code == 404:
+                await qdrant_client.put(
+                    f"{qdrant_url}/collections/{settings.qdrant_collection}",
+                    json={"vectors": {"size": 1536, "distance": "Cosine"}},
+                )
+                logger.info("Created Qdrant collection %s", settings.qdrant_collection)
             for product_id in products:
                 try:
-                    # Delete stale chunks for this product before reindexing.
-                    await qdrant_client.post(
+                    await qdrant_client.post(  # delete stale chunks before reindexing
                         f"{qdrant_url}/collections/{settings.qdrant_collection}/points/delete",
                         json={"filter": {"must": [{"key": "product_id", "match": {"value": product_id}}]}},
                     )
