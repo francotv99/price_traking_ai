@@ -112,7 +112,7 @@ async def conversational_query(
             sources=sources,
         )
 
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, RuntimeError) as exc:
         logger.exception("RAG query failed for product=%s", payload.product_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
