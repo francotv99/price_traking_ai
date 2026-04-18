@@ -43,11 +43,11 @@ class AnomalyDetector:
         diffs = np.diff(prices, prepend=prices[0])
         x = np.column_stack([prices, np.abs(diffs), times - times.min()])
 
-        self.model.fit(x)
-        predictions = self.model.predict(x)
-        anomaly_scores = -self.model.decision_function(x)
+        self.model.fit(x[:-1])
+        predictions = self.model.predict(x[-1:])
+        anomaly_scores = -self.model.decision_function(x[-1:])
 
-        is_anomaly = predictions[-1] == -1
+        is_anomaly = predictions[0] == -1
         latest_price = Decimal(str(prices[-1]))
 
         baseline_window = prices[:-1][-24:] if len(prices) > 1 else prices
@@ -78,7 +78,7 @@ class AnomalyDetector:
             anomaly=True,
             product_id=product_id,
             category=category,
-            score=float(round(anomaly_scores[-1], 4)),
+            score=float(round(anomaly_scores[0], 4)),
             price_actual=latest_price,
             price_expected=expected_price,
             delta_pct=round(delta_pct, 4),
