@@ -11,12 +11,13 @@
 - Funciona bien con series de tiempo no estacionarias como precios de criptomonedas.
 - Bajo costo computacional: entrena en milisegundos sobre 90 días de datos.
 - Devuelve un `decision_function` que usamos como score de confianza.
+- El modelo entrena sobre los N-1 días históricos y predice únicamente el último punto como dato nuevo — garantizando que el punto evaluado nunca fue visto durante el entrenamiento.
 
 **Por qué no Z-score:** Asume distribución normal. Los precios crypto tienen colas pesadas (fat tails) que generan muchos falsos positivos con Z-score.
 
 **Por qué no LSTM:** Requiere datos etiquetados o ventanas de entrenamiento largas. Excesivo para el volumen de datos actual y agrega complejidad de infraestructura (GPU, TensorFlow/PyTorch).
 
-**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con umbrales explícitos en la clasificación post-modelo: solo se emite `OPPORTUNITY` si el delta supera el threshold configurado (2% por defecto) **y** el movimiento lleva al menos 6 horas, filtrando spikes cortos que casi siempre son errores de datos.
+**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con umbrales explícitos en la clasificación post-modelo: solo se emite `OPPORTUNITY` si el delta supera el threshold configurado (1.4% por defecto) **y** el movimiento lleva al menos 6 horas, filtrando spikes cortos que casi siempre son errores de datos.
 
 ---
 

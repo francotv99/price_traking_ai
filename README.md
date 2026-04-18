@@ -145,7 +145,7 @@ curl http://localhost:8000/health
 | `ETL_LOOKBACK_DAYS` | Días de histórico a descargar por ejecución | `90` |
 | `ML_CONTAMINATION` | Proporción esperada de anomalías (Isolation Forest) | `0.05` |
 | `ML_LOOKBACK_DAYS` | Ventana de días para el modelo ML | `90` |
-| `ML_OPPORTUNITY_DELTA_THRESHOLD` | Delta mínimo para clasificar como OPPORTUNITY | `0.15` |
+| `ML_OPPORTUNITY_DELTA_THRESHOLD` | Delta mínimo para clasificar como OPPORTUNITY | `0.014` |
 | `ML_ANOMALY_WINDOW_HOURS` | Ventana temporal para clasificar DATA_ERROR | `1` |
 | `N8N_WEBHOOK_URL` | URL base de n8n para webhooks | `http://localhost:5678` |
 | `N8N_BASIC_AUTH_USER` | Usuario de n8n | `admin` |
@@ -323,7 +323,7 @@ Ver diagrama ERD completo en [docs/diagrams/erd.png](docs/diagrams/erd.png).
 | Limitación | Descripción |
 |------------|-------------|
 | CoinGecko free tier | Límite de ~30 requests/min. El fetcher implementa retry con backoff exponencial, pero en producción con más productos se requiere el tier Pro. |
-| Isolation Forest sin reentrenamiento incremental | El modelo se entrena en cada llamada a `/ml/detect` sobre los últimos N días. No hay persistencia del modelo entrenado. Aceptable para el volumen actual (4 productos). |
+| Isolation Forest entrenado sobre historial, predice punto nuevo | El modelo entrena con los N-1 días anteriores y evalúa el último precio como dato nuevo. Esto garantiza que el punto evaluado nunca fue visto durante el entrenamiento. No hay persistencia del modelo entrenado entre llamadas — aceptable para el volumen actual (4 productos). |
 | Clasificación heurística de anomalías | Los umbrales de `delta_pct > 40%` y `elapsed_hours` son heurísticos, no aprendidos. En mercados extremadamente volátiles pueden generar falsos positivos. |
 | Corpus sin reseñas de usuarios | El corpus RAG se construye desde la API de CoinGecko (descripción, market data, community). No incluye reseñas externas. |
 | n8n como punto único de orquestación | Si n8n no está disponible, el pipeline se detiene aunque el backend esté operativo. Mitigado con healthchecks en docker-compose. |
