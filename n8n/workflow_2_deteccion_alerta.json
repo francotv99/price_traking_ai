@@ -48,8 +48,8 @@
               "value": "={{ $json.crypto_currency }}"
             },
             {
-              "name": "lookback_minutes",
-              "value": "5"
+              "name": "lookback_days",
+              "value": "90"
             }
           ]
         },
