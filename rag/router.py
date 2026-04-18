@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencies import get_settings
+from api.settings import Settings
 from etl.fetcher import CoinGeckoFetcher
 from rag.corpus import CorpusBuilder
 from rag.models import QueryRequest, QueryResponse, ReindexRequest, ReindexResponse
@@ -15,6 +17,30 @@ from rag.retriever import RAGRetriever
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag"])
+
+
+@lru_cache(maxsize=1)
+def _build_retriever(
+    qdrant_host: str,
+    qdrant_port: int,
+    qdrant_collection: str,
+    openai_api_key: str,
+) -> RAGRetriever:
+    return RAGRetriever(
+        qdrant_host=qdrant_host,
+        qdrant_port=qdrant_port,
+        qdrant_collection=qdrant_collection,
+        openai_api_key=openai_api_key,
+    )
+
+
+def get_retriever(settings: Settings = Depends(get_settings)) -> RAGRetriever:
+    return _build_retriever(
+        qdrant_host=settings.qdrant_host,
+        qdrant_port=settings.qdrant_port,
+        qdrant_collection=settings.qdrant_collection,
+        openai_api_key=settings.openai_api_key or "",
+    )
 
 
 @router.post("/reindex", response_model=ReindexResponse)
@@ -82,6 +108,7 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
 async def conversational_query(
     payload: QueryRequest,
     settings=Depends(get_settings),
+    retriever: RAGRetriever = Depends(get_retriever),
 ) -> QueryResponse:
     """Answer a free-form question about a registered product using RAG.
 
@@ -97,13 +124,6 @@ async def conversational_query(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OPENAI_API_KEY is not configured.",
         )
-
-    retriever = RAGRetriever(
-        qdrant_host=settings.qdrant_host,
-        qdrant_port=settings.qdrant_port,
-        qdrant_collection=settings.qdrant_collection,
-        openai_api_key=settings.openai_api_key,
-    )
 
     try:
         answer, sources, resolved_ids = await retriever.query(
