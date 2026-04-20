@@ -8,6 +8,13 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+_ALIASES: dict[str, str] = {
+    "bitcoin": "bitcoin", "btc": "bitcoin",
+    "ethereum": "ethereum", "eth": "ethereum", "ether": "ethereum",
+    "solana": "solana", "sol": "solana",
+    "cardano": "cardano", "ada": "cardano",
+}
+
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "conversational_query.txt"
 _PROMPT_TEMPLATE = _PROMPT_PATH.read_text(encoding="utf-8")
 
@@ -91,6 +98,11 @@ class RAGRetriever:
 
     async def _extract_product_ids(self, client: httpx.AsyncClient, question: str) -> list[str]:
         """Infer one or more CoinGecko product IDs from a free-form question."""
+        q_lower = question.lower()
+        found = list(dict.fromkeys(v for k, v in _ALIASES.items() if k in q_lower))
+        if found:
+            return found
+
         response = await client.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {self.openai_api_key}"},
