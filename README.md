@@ -4,7 +4,7 @@ Sistema de monitoreo de precios de criptomonedas con detección de anomalías me
 
 ## Demo
 
-[Ver demostración en video (Loom)](https://www.loom.com/share/519dc7c628ab4882b93fc4b550dd384b)
+[Ver demostración en video (Loom)](https://www.loom.com/share/98982055f65247f9a838b412513f33c7)
 
 ---
 
