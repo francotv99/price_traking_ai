@@ -72,7 +72,7 @@ async def run_etl(
         )
         return result
 
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, RuntimeError) as exc:
         logger.exception("ETL pipeline failed")
         result.status = "error"
         result.errors.append(str(exc))

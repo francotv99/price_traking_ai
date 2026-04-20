@@ -8,6 +8,13 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+_ALIASES: dict[str, str] = {
+    "bitcoin": "bitcoin", "btc": "bitcoin",
+    "ethereum": "ethereum", "eth": "ethereum", "ether": "ethereum",
+    "solana": "solana", "sol": "solana",
+    "cardano": "cardano", "ada": "cardano",
+}
+
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "conversational_query.txt"
 _PROMPT_TEMPLATE = _PROMPT_PATH.read_text(encoding="utf-8")
 
@@ -30,29 +37,105 @@ class RAGRetriever:
         self.openai_llm_key = openai_api_key_for_llm or openai_api_key
         self.top_k = top_k
 
-    async def query(self, product_id: str, question: str) -> tuple[str, list[str]]:
-        """Answer a free-form question about a product using RAG."""
+    async def query(
+        self,
+        question: str,
+        product_id: str | None = None,
+        available_products: list[str] | None = None,
+    ) -> tuple[str, list[str], list[str]]:
+        """Answer a free-form question, inferring one or more products from the question if not provided."""
         async with httpx.AsyncClient(timeout=60) as client:
-            query_vector = await self._embed(client, question)
-            chunks = await self._search(client, product_id=product_id, vector=query_vector)
+            if product_id:
+                resolved_ids = [product_id]
+            else:
+                resolved_ids = await self._extract_product_ids(client, question)
 
-            if not chunks:
+            if resolved_ids == ["unknown"]:
+                catalog = available_products or []
+                if catalog:
+                    listed = ", ".join(catalog)
+                    return (
+                        f"Tengo información disponible sobre: {listed}. "
+                        "¿Sobre cuál quieres saber?",
+                        [],
+                        ["unknown"],
+                    )
                 return (
-                    f"No hay información indexada para '{product_id}' en el corpus. "
-                    "Ejecuta primero POST /rag/reindex para indexar el corpus del producto.",
+                    "No identifiqué ninguna criptomoneda en tu pregunta. "
+                    "Prueba mencionando bitcoin, ethereum, solana o cardano.",
                     [],
+                    ["unknown"],
                 )
 
-            sources = [c["payload"].get("source", "unknown") for c in chunks]
-            context = self._build_context(chunks)
-            answer = await self._generate(client, product_id=product_id, question=question, context=context)
-            return answer, list(dict.fromkeys(sources))
+            query_vector = await self._embed(client, question)
+
+            all_chunks: list[dict] = []
+            missing: list[str] = []
+            for pid in resolved_ids:
+                chunks = await self._search(client, product_id=pid, vector=query_vector)
+                if chunks:
+                    all_chunks.extend(chunks)
+                else:
+                    missing.append(pid)
+
+            if not all_chunks:
+                return (
+                    f"No hay información indexada para {resolved_ids} en el corpus. "
+                    "Ejecuta primero POST /rag/reindex para indexar el corpus.",
+                    [],
+                    resolved_ids,
+                )
+
+            sources = list(dict.fromkeys(c["payload"].get("source", "unknown") for c in all_chunks))
+            context = self._build_context(all_chunks)
+            products_label = " y ".join(resolved_ids)
+            answer = await self._generate(client, product_id=products_label, question=question, context=context)
+
+            if missing:
+                answer += f"\n\n⚠️ Sin datos indexados para: {', '.join(missing)}."
+
+            return answer, sources, resolved_ids
+
+    async def _extract_product_ids(self, client: httpx.AsyncClient, question: str) -> list[str]:
+        """Infer one or more CoinGecko product IDs from a free-form question."""
+        q_lower = question.lower()
+        found = list(dict.fromkeys(v for k, v in _ALIASES.items() if k in q_lower))
+        if found:
+            return found
+
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {self.openai_api_key}"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Extrae los IDs de CoinGecko de todas las criptomonedas mencionadas. "
+                            "Responde SOLO con los IDs en minúsculas separados por coma, sin espacios. "
+                            "Alias válidos: btc/BTC/Bitcoin → bitcoin, "
+                            "eth/ETH/Ethereum/ether → ethereum, sol/SOL/Solana → solana, "
+                            "ada/ADA/Cardano → cardano. "
+                            "Ejemplo de múltiples: bitcoin,ethereum "
+                            "Si no hay ninguna criptomoneda, responde exactamente: unknown"
+                        ),
+                    },
+                    {"role": "user", "content": question},
+                ],
+                "temperature": 0,
+                "max_tokens": 40,
+            },
+        )
+        response.raise_for_status()
+        raw = str(response.json()["choices"][0]["message"]["content"]).strip().lower()
+        return [p.strip() for p in raw.split(",") if p.strip()]
 
     async def _embed(self, client: httpx.AsyncClient, text: str) -> list[float]:
         response = await client.post(
             "https://api.openai.com/v1/embeddings",
             headers={"Authorization": f"Bearer {self.openai_api_key}"},
-            json={"input": text, "model": "text-embedding-ada-002"},
+            json={"input": text, "model": "text-embedding-3-small"},
         )
         response.raise_for_status()
         return list(response.json()["data"][0]["embedding"])

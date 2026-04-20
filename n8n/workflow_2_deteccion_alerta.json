@@ -49,7 +49,7 @@
             },
             {
               "name": "lookback_minutes",
-              "value": "5"
+              "value": "60"
             }
           ]
         },
@@ -133,6 +133,15 @@
               "rightValue": true,
               "operator": {
                 "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "eb272682-af72-489b-91ec-98bd78b1ef3c",
+              "leftValue": "={{ $json.category }}",
+              "rightValue": "OPPORTUNITY",
+              "operator": {
+                "type": "string",
                 "operation": "equals"
               }
             }
@@ -312,7 +321,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "e0477da0-c3ed-424b-908e-6a8dadabac07",
+  "versionId": "98efe454-354c-4c23-953d-6a2db753c4e9",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"

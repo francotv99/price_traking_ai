@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 
 from api.dependencies import get_session, get_settings
 from ml.detector import AnomalyDetector
-from ml.models import AnomalyEventCreate, AnomalyResult, DetectAnomalyRequest
+from ml.models import AnomalyEventCreate, AnomalyResult, DetectAnomalyRequest, PricePoint
 from ml.repository import MLRepository
 
 logger = logging.getLogger(__name__)
@@ -73,3 +75,48 @@ async def detect_anomaly(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"ML detection failed: {exc}",
         ) from exc
+
+
+class SimulateRequest(BaseModel):
+    product_id: str = Field(default="bitcoin")
+    base_price: float = Field(default=76000.0, description="Precio base estable en USD")
+    spike_pct: float = Field(default=0.15, ge=0.02, le=2.0, description="Porcentaje de spike (0.15 = 15%)")
+    history_days: int = Field(default=89, ge=10, le=365)
+
+
+@router.post("/detect/simulate", response_model=AnomalyResult, tags=["ml"])
+async def simulate_anomaly(
+    payload: SimulateRequest,
+    settings=Depends(get_settings),
+) -> AnomalyResult:
+    """Simulate an OPPORTUNITY anomaly with synthetic data for demo purposes.
+
+    Generates a stable price history and injects a spike on the latest point
+    so the detector reliably returns OPPORTUNITY without needing real market movement.
+    """
+    now = datetime.now(timezone.utc)
+
+    series = [
+        PricePoint(
+            product_id=payload.product_id,
+            price_usd=Decimal(str(round(payload.base_price + i * (payload.base_price * 0.0001), 2))),
+            recorded_at=now - timedelta(days=payload.history_days - i),
+        )
+        for i in range(payload.history_days)
+    ]
+
+    spike_price = round(payload.base_price * (1 + payload.spike_pct), 2)
+    series.append(
+        PricePoint(
+            product_id=payload.product_id,
+            price_usd=Decimal(str(spike_price)),
+            recorded_at=now,
+        )
+    )
+
+    detector = AnomalyDetector(
+        contamination=0.1,
+        opportunity_delta_threshold=settings.ml_opportunity_delta_threshold,
+        anomaly_window_hours=settings.ml_anomaly_window_hours,
+    )
+    return detector.detect(product_id=payload.product_id, series=series)

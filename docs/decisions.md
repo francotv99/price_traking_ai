@@ -11,12 +11,13 @@
 - Funciona bien con series de tiempo no estacionarias como precios de criptomonedas.
 - Bajo costo computacional: entrena en milisegundos sobre 90 días de datos.
 - Devuelve un `decision_function` que usamos como score de confianza.
+- El modelo entrena sobre los N-1 días históricos y predice únicamente el último punto como dato nuevo — garantizando que el punto evaluado nunca fue visto durante el entrenamiento.
 
 **Por qué no Z-score:** Asume distribución normal. Los precios crypto tienen colas pesadas (fat tails) que generan muchos falsos positivos con Z-score.
 
 **Por qué no LSTM:** Requiere datos etiquetados o ventanas de entrenamiento largas. Excesivo para el volumen de datos actual y agrega complejidad de infraestructura (GPU, TensorFlow/PyTorch).
 
-**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con el soft guard: si `delta_pct < 15%`, la anomalía se reclasifica como `DATA_ERROR` aunque el modelo la marque como `OPPORTUNITY`.
+**Trade-off:** Isolation Forest no distingue bien entre anomalías de magnitud pequeña. Se mitiga con umbrales explícitos en la clasificación post-modelo: solo se emite `OPPORTUNITY` si el delta supera el threshold configurado (1.4% por defecto) **y** el movimiento lleva al menos 6 horas, filtrando spikes cortos que casi siempre son errores de datos.
 
 ---
 
@@ -25,9 +26,9 @@
 **Decisión:** Toda anomalía se clasifica en una de dos categorías usando tiempo transcurrido y magnitud del delta.
 
 ```
-delta > 40% en < 1h  → DATA_ERROR  (probablemente error de la fuente)
-delta > 40% en >= 6h → OPPORTUNITY (movimiento real de mercado)
-delta < threshold     → DATA_ERROR  (soft guard, no es relevante como oportunidad)
+delta > 40% en <= 1h          → DATA_ERROR  (spike rápido, probablemente error de la fuente)
+delta >= threshold% en >= 6h  → OPPORTUNITY (movimiento sostenido, real de mercado)
+cualquier otro caso           → DATA_ERROR  (outlier débil, no relevante como oportunidad)
 ```
 
 **Por qué:** Una caída o subida de 50% en un minuto es casi siempre un spike de datos o error de la API. La misma variación en 6+ horas tiene mucha más probabilidad de ser un movimiento real de mercado.

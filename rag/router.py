@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.dependencies import get_settings
+from api.settings import Settings
 from etl.fetcher import CoinGeckoFetcher
 from rag.corpus import CorpusBuilder
 from rag.models import QueryRequest, QueryResponse, ReindexRequest, ReindexResponse
@@ -15,6 +17,30 @@ from rag.retriever import RAGRetriever
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag"])
+
+
+@lru_cache(maxsize=1)
+def _build_retriever(
+    qdrant_host: str,
+    qdrant_port: int,
+    qdrant_collection: str,
+    openai_api_key: str,
+) -> RAGRetriever:
+    return RAGRetriever(
+        qdrant_host=qdrant_host,
+        qdrant_port=qdrant_port,
+        qdrant_collection=qdrant_collection,
+        openai_api_key=openai_api_key,
+    )
+
+
+def get_retriever(settings: Settings = Depends(get_settings)) -> RAGRetriever:
+    return _build_retriever(
+        qdrant_host=settings.qdrant_host,
+        qdrant_port=settings.qdrant_port,
+        qdrant_collection=settings.qdrant_collection,
+        openai_api_key=settings.openai_api_key or "",
+    )
 
 
 @router.post("/reindex", response_model=ReindexResponse)
@@ -32,13 +58,26 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
     products_reindexed = []
     errors: list[str] = []
 
+    qdrant_url = f"http://{settings.qdrant_host}:{settings.qdrant_port}"
+
     try:
         async with CoinGeckoFetcher(
             base_url=settings.coingecko_base_url,
             api_key=settings.coingecko_api_key,
-        ) as fetcher:
+        ) as fetcher, httpx.AsyncClient(timeout=15) as qdrant_client:
+            check = await qdrant_client.get(f"{qdrant_url}/collections/{settings.qdrant_collection}")
+            if check.status_code == 404:
+                await qdrant_client.put(
+                    f"{qdrant_url}/collections/{settings.qdrant_collection}",
+                    json={"vectors": {"size": 1536, "distance": "Cosine"}},
+                )
+                logger.info("Created Qdrant collection %s", settings.qdrant_collection)
             for product_id in products:
                 try:
+                    await qdrant_client.post(  # delete stale chunks before reindexing
+                        f"{qdrant_url}/collections/{settings.qdrant_collection}/points/delete",
+                        json={"filter": {"must": [{"key": "product_id", "match": {"value": product_id}}]}},
+                    )
                     result = await builder.build_for_product(product_id=product_id, fetcher=fetcher)
                     products_results.append(result)
                     products_reindexed.append(product_id)
@@ -69,6 +108,7 @@ async def reindex_corpus(payload: ReindexRequest, settings=Depends(get_settings)
 async def conversational_query(
     payload: QueryRequest,
     settings=Depends(get_settings),
+    retriever: RAGRetriever = Depends(get_retriever),
 ) -> QueryResponse:
     """Answer a free-form question about a registered product using RAG.
 
@@ -85,26 +125,20 @@ async def conversational_query(
             detail="OPENAI_API_KEY is not configured.",
         )
 
-    retriever = RAGRetriever(
-        qdrant_host=settings.qdrant_host,
-        qdrant_port=settings.qdrant_port,
-        qdrant_collection=settings.qdrant_collection,
-        openai_api_key=settings.openai_api_key,
-    )
-
     try:
-        answer, sources = await retriever.query(
-            product_id=payload.product_id,
+        answer, sources, resolved_ids = await retriever.query(
             question=payload.question,
+            product_id=payload.product_id,
+            available_products=settings.etl_products_list,
         )
         return QueryResponse(
-            product_id=payload.product_id,
+            product_ids=resolved_ids,
             question=payload.question,
             answer=answer,
             sources=sources,
         )
 
-    except Exception as exc:
+    except (httpx.HTTPError, OSError, RuntimeError) as exc:
         logger.exception("RAG query failed for product=%s", payload.product_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

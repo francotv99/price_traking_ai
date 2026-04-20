@@ -128,7 +128,13 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -137,11 +143,12 @@
         -16
       ],
       "id": "eb42b66d-2a44-4bc0-aec1-a6a05ea630d1",
-      "name": "HTTP Request"
+      "name": "HTTP Request",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "amount": 2
+        "amount": 1
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -165,10 +172,10 @@
           "conditions": [
             {
               "id": "b8769834-04bf-4a81-8204-631d0f1e514f",
-              "leftValue": "={{ $json.status }}",
-              "rightValue": "ok",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
               "operator": {
-                "type": "string",
+                "type": "number",
                 "operation": "equals"
               }
             }
@@ -188,7 +195,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const products = $json.products ?? [];\nconst out = [];\n\nfunction toUint32Id(value) {\n  // Hash simple deterministico -> entero unsigned 32-bit\n  let h = 2166136261; // FNV offset basis\n  for (let i = 0; i < value.length; i++) {\n    h ^= value.charCodeAt(i);\n    h = Math.imul(h, 16777619);\n  }\n  return h >>> 0;\n}\n\nfor (const p of products) {\n  for (const c of (p.chunks ?? [])) {\n    const rawChunkId = String(c.chunk_id ?? \"\");\n    const pointId = toUint32Id(rawChunkId);\n\n    out.push({\n      json: {\n        point_id: pointId,         // <- usar esto como \"id\" en Qdrant\n        chunk_id: rawChunkId,      // <- guardar original en payload\n        product_id: c.product_id,\n        source: c.source,\n        text: c.text,\n        metadata: c.metadata ?? {},\n      }\n    });\n  }\n}\n\nreturn out;"
+        "jsCode": "const products = $json.body?.products ?? [];\nconst out = [];\n\nfunction toUint32Id(value) {\n  // Hash simple deterministico -> entero unsigned 32-bit\n  let h = 2166136261; // FNV offset basis\n  for (let i = 0; i < value.length; i++) {\n    h ^= value.charCodeAt(i);\n    h = Math.imul(h, 16777619);\n  }\n  return h >>> 0;\n}\n\nfor (const p of products) {\n  for (const c of (p.chunks ?? [])) {\n    const rawChunkId = String(c.chunk_id ?? \"\");\n    const pointId = toUint32Id(rawChunkId);\n\n    out.push({\n      json: {\n        point_id: pointId,         // <- usar esto como \"id\" en Qdrant\n        chunk_id: rawChunkId,      // <- guardar original en payload\n        product_id: c.product_id,\n        source: c.source,\n        text: c.text,\n        metadata: c.metadata ?? {},\n      }\n    });\n  }\n}\n\nreturn out;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -227,13 +234,11 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "Bearer {{ $env.OPENAI_API_KEY }}"
-            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -243,7 +248,13 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"text-embedding-3-small\",\n  \"input\": {{  JSON.stringify($('Code in JavaScript').item.json.text) }}\n}",
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -252,7 +263,14 @@
         -16
       ],
       "id": "21b77c78-8225-4ea3-93ce-560ec7f1f08e",
-      "name": "HTTP Request1"
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E4h5OhC2QiAraRGH",
+          "name": "headerOpenAI"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -261,8 +279,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1616,
-        -16
+        1856,
+        -32
       ],
       "id": "bc9cb7e9-3642-4d3e-abda-f7e0e8567fa0",
       "name": "Wait1",
@@ -275,7 +293,7 @@
             {
               "id": "45b5c5cd-296e-4da0-84e3-75607253b154",
               "name": "embbeings",
-              "value": "={{ $('HTTP Request1').item.json.data[0].embedding }}",
+              "value": "={{ $('HTTP Request1').item.json.body.data[0].embedding }}",
               "type": "array"
             }
           ]
@@ -285,7 +303,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1824,
+        2064,
         -16
       ],
       "id": "e48623e2-1ae8-4b87-acaa-ef408ce16d8b",
@@ -303,88 +321,11 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2176,
-        64
+        2368,
+        160
       ],
       "id": "919802ed-203d-498d-a853-04d740bacc7e",
       "name": "HTTP Request2"
-    },
-    {
-      "parameters": {
-        "chatId": "5529415400",
-        "text": "=Reindexacion guardado de manera exitosa para la moneda:  {{ $('Code in JavaScript').item.json.product_id }}",
-        "additionalFields": {}
-      },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1728,
-        -352
-      ],
-      "id": "98c85ed7-0fc2-4d36-b726-4ed9f570a0a0",
-      "name": "Send a text message",
-      "webhookId": "b6508e7d-0190-45a3-8d0e-b00a602dabf8",
-      "credentials": {
-        "telegramApi": {
-          "id": "7QVVv7cC54f7U7vl",
-          "name": "Telegram account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "fa709347-881d-433e-8943-2e48e5c006ed",
-              "leftValue": "={{ $json.status }}",
-              "rightValue": "ok",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1408,
-        -240
-      ],
-      "id": "f0b77a31-2989-4348-91af-60c4207e9cae",
-      "name": "If2"
-    },
-    {
-      "parameters": {
-        "chatId": "5529415400",
-        "text": "=Se produjo un error al relauzar el quadrant en la moneda:  {{ $('Code in JavaScript').item.json.product_id }}",
-        "additionalFields": {}
-      },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1728,
-        -192
-      ],
-      "id": "ecf8ddc1-182c-407d-868c-96359b2cb799",
-      "name": "Send a text message1",
-      "webhookId": "b6508e7d-0190-45a3-8d0e-b00a602dabf8",
-      "credentials": {
-        "telegramApi": {
-          "id": "7QVVv7cC54f7U7vl",
-          "name": "Telegram account"
-        }
-      }
     },
     {
       "parameters": {
@@ -399,8 +340,8 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -656,
-        416
+        -688,
+        320
       ],
       "id": "a73e0682-9ccc-4484-bbad-f22d5a09eb19",
       "name": "Schedule Trigger"
@@ -428,8 +369,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -432,
-        416
+        -464,
+        320
       ],
       "id": "d54c64e7-4f07-470d-a656-532573cc3658",
       "name": "env"
@@ -446,8 +387,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -192,
-        416
+        -224,
+        320
       ],
       "id": "e22fd8a7-1680-418e-8493-d3d686bf0164",
       "name": "HTTP Request3"
@@ -461,8 +402,8 @@
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        224,
-        416
+        192,
+        320
       ],
       "id": "6122d078-8ed5-49fc-b75e-da1039a83fb8",
       "name": "Split Out"
@@ -502,8 +443,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        32,
-        416
+        0,
+        320
       ],
       "id": "7039c9f3-5b72-4bb0-944f-174ee17a152e",
       "name": "Edit Fields2"
@@ -521,16 +462,66 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        464,
-        416
+        432,
+        320
       ],
       "id": "714ef85f-80e5-470b-9772-d6edc6e16659",
       "name": "HTTP Request4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6de7bb66-844f-4d86-abf6-5b05e7a9da31",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        -16
+      ],
+      "id": "cfea7d09-a8fb-4ade-8dc6-f0f389b6dc24",
+      "name": "If2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        144
+      ],
+      "id": "6edd6536-3071-4682-b247-e01780602b1f",
+      "name": "No Operation, do nothing2"
     }
   ],
   "pinData": {
@@ -683,13 +674,7 @@
     },
     "Loop Over Items": {
       "main": [
-        [
-          {
-            "node": "If2",
-            "type": "main",
-            "index": 0
-          }
-        ],
+        [],
         [
           {
             "node": "HTTP Request1",
@@ -703,7 +688,7 @@
       "main": [
         [
           {
-            "node": "Wait1",
+            "node": "If2",
             "type": "main",
             "index": 0
           }
@@ -737,24 +722,6 @@
         [
           {
             "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "If2": {
-      "main": [
-        [
-          {
-            "node": "Send a text message",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Send a text message1",
             "type": "main",
             "index": 0
           }
@@ -826,6 +793,24 @@
           }
         ]
       ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -833,7 +818,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "f91c8f5e-4f05-4785-9cfd-89006716b32e",
+  "versionId": "03e2d878-36c5-4416-b27e-1b24f131d737",
   "meta": {
     "instanceId": "e118c926172bbfe1e403861cd2eeee1eb22bdc4e7864fb4b19e758fbae8157a7"
   },

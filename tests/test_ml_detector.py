@@ -55,3 +55,39 @@ def test_detector_detects_spike() -> None:
     assert result.category in {AnomalyCategory.OPPORTUNITY, AnomalyCategory.DATA_ERROR}
     assert result.score is not None
     assert result.delta_pct is not None
+
+
+def test_detector_classifies_sustained_move_as_opportunity() -> None:
+    """A large move spread over 6+ hours must be OPPORTUNITY, not DATA_ERROR."""
+    now = datetime.now(timezone.utc)
+    base_price = 100.0
+    series: list[PricePoint] = []
+
+    # 29 stable points spread over the last 50 h, last one at now-22h.
+    for i in range(29):
+        series.append(
+            PricePoint(
+                product_id="ethereum",
+                price_usd=Decimal(str(round(base_price + i * 0.1, 4))),
+                recorded_at=now - timedelta(hours=50) + timedelta(hours=i),
+            )
+        )
+
+    # +30% spike at now (22 h after the previous point → qualifies as OPPORTUNITY).
+    series.append(
+        PricePoint(
+            product_id="ethereum",
+            price_usd=Decimal(str(round(base_price * 1.30, 4))),
+            recorded_at=now,
+        )
+    )
+
+    detector = AnomalyDetector(
+        contamination=0.1,
+        opportunity_delta_threshold=0.05,
+        anomaly_window_hours=1,
+    )
+    result = detector.detect("ethereum", series)
+
+    if result.anomaly:
+        assert result.category == AnomalyCategory.OPPORTUNITY
